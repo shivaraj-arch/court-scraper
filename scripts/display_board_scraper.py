@@ -108,13 +108,14 @@ def update_supabase(records):
 def main():
     """Main execution"""
     logging.info("Starting display board scraper")
-    
+   
+    """ not needed as checked in yml
     # Check working hours (IST)
     now = datetime.now()
     if not (time(10, 25) <= now.time() <= time(17, 30)):
         logging.info("Outside court hours, skipping")
         return
-    
+    """
     records = scrape_display_board()
     logging.info(f"Scraped {len(records)} records")
     
