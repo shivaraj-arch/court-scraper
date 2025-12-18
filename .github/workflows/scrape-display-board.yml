@@ -2,15 +2,16 @@ name: Scrape Display Board
 
 on:
   schedule:
-    # Run every 5 minutes from 10:25 AM to 5:30 PM IST (4:55 AM to 12:00 PM UTC)
-    - cron: '25-59/5 4 * * *'      # 10:25-10:59 AM IST
-    - cron: '*/5 5-11 * * *'        # 11:00 AM-4:59 PM IST
-    - cron: '0-30/5 12 * * *'       # 5:00-5:30 PM IST
-  workflow_dispatch:  # Allow manual trigger
+    # First session: 10:25 AM - 1:30 PM IST (4:55 AM - 8:00 AM UTC)
+    - cron: '55 4 * * *'
+    # Second session: 2:30 PM - 6:30 PM IST (9:00 AM - 1:00 PM UTC)
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
 jobs:
-  scrape:
+  scrape-morning:
     runs-on: ubuntu-latest
+    if: github.event.schedule == '55 4 * * *' || github.event_name == 'workflow_dispatch'
     
     steps:
     - name: Checkout code
@@ -28,21 +29,77 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
     
     - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
+      run: pip install -r requirements.txt
     
-    - name: Run scraper (10 times with 30-sec delay)
+    - name: Scrape display board (10:25 AM - 1:30 PM)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
-        for i in {1..10}; do
-          echo "Run $i of 10"
+        # Run for 3 hours 5 minutes (185 minutes = 370 scrapes)
+        END_TIME=$(($(date +%s) + 11100))
+        COUNT=0
+        
+        echo "Starting morning session: 10:25 AM - 1:30 PM IST"
+        
+        while [ $(date +%s) -lt $END_TIME ]; do
+          COUNT=$((COUNT + 1))
+          echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
           python scripts/display_board_scraper.py
-          if [ $i -lt 10 ]; then
+          
+          # Sleep 30 seconds unless it's the last iteration
+          if [ $(date +%s) -lt $END_TIME ]; then
             sleep 30
           fi
         done
+        
+        echo "Morning session completed. Total scrapes: $COUNT"
+  
+  scrape-afternoon:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    
+    - name: Scrape display board (2:30 PM - 6:30 PM)
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        # Run for 4 hours (240 minutes = 480 scrapes)
+        END_TIME=$(($(date +%s) + 14400))
+        COUNT=0
+        
+        echo "Starting afternoon session: 2:30 PM - 6:30 PM IST"
+        
+        while [ $(date +%s) -lt $END_TIME ]; do
+          COUNT=$((COUNT + 1))
+          echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
+          python scripts/display_board_scraper.py
+          
+          # Sleep 30 seconds unless it's the last iteration
+          if [ $(date +%s) -lt $END_TIME ]; then
+            sleep 30
+          fi
+        done
+        
+        echo "Afternoon session completed. Total scrapes: $COUNT"
     
     - name: Upload logs
       if: always()
