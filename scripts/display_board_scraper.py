@@ -1,125 +1,110 @@
-#!/usr/bin/env python3
-"""
-Display Board Scraper for GitHub Actions
-Scrapes court display board and stores in Supabase
-"""
+name: Scrape Display Board
 
-import os
-import sys
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, time
-from supabase import create_client, Client
-import logging
+on:
+  schedule:
+    # First session: 10:25 AM - 1:30 PM IST (4:55 AM - 8:00 AM UTC)
+    - cron: '55 4 * * *'
+    # Second session: 2:30 PM - 6:30 PM IST (9:00 AM - 1:00 PM UTC)
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
-# Configuration from environment variables
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-DISPLAY_BOARD_URL = "https://judiciary.karnataka.gov.in/display_board_bench.php"
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-
-def scrape_display_board():
-    """Scrape the display board"""
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(DISPLAY_BOARD_URL, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        records = []
-        
-        tables = soup.find_all('table')
-        for table in tables:
-            rows = table.find_all('tr')[1:]
-            
-            for row in rows:
-                cols = row.find_all('td')
-                if len(cols) >= 4:
-                    ch_no = cols[0].get_text(strip=True)
-                    list_no = cols[1].get_text(strip=True)
-                    case_no = cols[3].get_text(strip=True)
-                    
-                    if ch_no and list_no and case_no:
-                        records.append({
-                            'ch_no': int(ch_no) if ch_no.isdigit() else ch_no,
-                            'list_no': int(list_no) if list_no.isdigit() else list_no,
-                            'case_no': case_no
-                        })
-        
-        return records
-    except Exception as e:
-        logging.error(f"Scraping error: {e}")
-        return []
-
-def update_supabase(records):
-    """Update Supabase with heard cases"""
-    if not records:
-        logging.info("No records to update")
-        return 0
+jobs:
+  scrape-morning:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '55 4 * * *' || github.event_name == 'workflow_dispatch'
     
-    try:
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        timestamp = datetime.now().isoformat()
-        new_count = 0
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+    
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    
+    - name: Scrape display board (10:25 AM - 1:30 PM)
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        # Run for 3 hours 5 minutes (185 minutes = 370 scrapes)
+        END_TIME=$(($(date +%s) + 11100))
+        COUNT=0
         
-        for record in records:
-            ch_no = record['ch_no']
-            list_no = record['list_no']
-            case_no = record['case_no']
-            
-            # Check if case already exists
-            existing = supabase.table('heard_cases').select('id', 'total_appearances').eq(
-                'date', date_str
-            ).eq('court_hall', ch_no).eq('case_number', case_no).execute()
-            
-            if existing.data:
-                # Update: increment appearances, update last_heard_at
-                case_id = existing.data[0]['id']
-                appearances = existing.data[0]['total_appearances'] + 1
-                
-                supabase.table('heard_cases').update({
-                    'last_heard_at': timestamp,
-                    'total_appearances': appearances,
-                    'updated_at': timestamp
-                }).eq('id', case_id).execute()
-            else:
-                # Insert new case
-                supabase.table('heard_cases').insert({
-                    'date': date_str,
-                    'court_hall': ch_no,
-                    'list_number': list_no,
-                    'case_number': case_no,
-                    'first_heard_at': timestamp,
-                    'last_heard_at': timestamp,
-                    'total_appearances': 1,
-                    'status': 'in_progress'
-                }).execute()
-                new_count += 1
+        echo "Starting morning session: 10:25 AM - 1:30 PM IST"
         
-        logging.info(f"Updated Supabase: {new_count} new cases, {len(records)-new_count} updated")
-        return new_count
+        while [ $(date +%s) -lt $END_TIME ]; do
+          COUNT=$((COUNT + 1))
+          echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
+          python scripts/display_board_scraper.py
+          
+          # Sleep 30 seconds unless it's the last iteration
+          if [ $(date +%s) -lt $END_TIME ]; then
+            sleep 30
+          fi
+        done
+        
+        echo "Morning session completed. Total scrapes: $COUNT"
+  
+  scrape-afternoon:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
     
-    except Exception as e:
-        logging.error(f"Supabase error: {e}")
-        return 0
-
-def main():
-    """Main execution"""
-    logging.info("Starting display board scraper")
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    # Check working hours (IST)
-    now = datetime.now()
-    if not (time(10, 25) <= now.time() <= time(17, 30)):
-        logging.info("Outside court hours, skipping")
-        return
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
     
-    records = scrape_display_board()
-    logging.info(f"Scraped {len(records)} records")
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
     
-    if records:
-        update_supabase(records)
-
-if __name__ == "__main__":
-    main()
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+    
+    - name: Scrape display board (2:30 PM - 6:30 PM)
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        # Run for 4 hours (240 minutes = 480 scrapes)
+        END_TIME=$(($(date +%s) + 14400))
+        COUNT=0
+        
+        echo "Starting afternoon session: 2:30 PM - 6:30 PM IST"
+        
+        while [ $(date +%s) -lt $END_TIME ]; do
+          COUNT=$((COUNT + 1))
+          echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
+          python scripts/display_board_scraper.py
+          
+          # Sleep 30 seconds unless it's the last iteration
+          if [ $(date +%s) -lt $END_TIME ]; then
+            sleep 30
+          fi
+        done
+        
+        echo "Afternoon session completed. Total scrapes: $COUNT"
+    
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scraper-logs-${{ github.run_number }}
+        path: '*.log'
+        retention-days: 7
