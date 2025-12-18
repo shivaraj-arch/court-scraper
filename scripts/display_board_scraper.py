@@ -19,14 +19,37 @@ DISPLAY_BOARD_URL = "https://judiciary.karnataka.gov.in/display_board_bench.php"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
+
+def http_worker_call_to_supabase():
+    url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-responder"
+    supabase: Client = create_client(url, SUPABASE_KEY)
+    try:
+        # Invoke the function
+        response = supabase.functions.invoke(
+            "http-responder", # Name of your Edge Function
+            invoke_options={
+                "body": {"targetUrl": DISPLAY_BOARD_URL},
+                "method": "POST"
+            }
+        )
+        # Access the downloaded data
+        # If the function returns a file, 'response.content' will contain the binary data
+        return response
+    except Exception as e:
+        print(f"Exception:{e}")
+
+
 def scrape_display_board():
     """Scrape the display board"""
     try:
+        """
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(DISPLAY_BOARD_URL, headers=headers, timeout=10)
         response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
+        """
+        response = http_worker_call_to_supabase()
+        #soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response, 'html.parser')
         records = []
         
         tables = soup.find_all('table')

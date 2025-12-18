@@ -19,12 +19,36 @@ CAUSE_LIST_URL = "https://judiciary.karnataka.gov.in/pdfs/consolidatedCauselist/
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
+def http_worker_call_to_supabase():
+    url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-worker"
+    supabase: Client = create_client(url, SUPABASE_KEY)
+    try:
+        # Invoke the function
+        response = supabase.functions.invoke(
+            "http-worker", # Name of your Edge Function
+            invoke_options={
+                "body": {"targetUrl": CAUSE_LIST_URL},
+                "method": "POST"
+            }
+        )
+        # Access the downloaded data
+        # If the function returns a file, 'response.content' will contain the binary data
+        return response
+        """
+        with open("downloaded_file.pdf", "wb") as f:
+            f.write(response)
+        print("Download complete.")
+        """
+    except Exception as e:
+        print(f"Exception:{e}")
+
 def download_pdf(url):
     """Download PDF from URL"""
     try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        return BytesIO(response.content)
+        #response = requests.get(url, timeout=30)
+        #response.raise_for_status()
+        #return BytesIO(response.content)
+        return BytesIO(http_worker_call_to_supabase())
     except Exception as e:
         logging.error(f"PDF download error: {e}")
         return None
@@ -135,6 +159,9 @@ def main():
     
     if cases:
         insert_to_supabase(cases)
+
+
+
 
 if __name__ == "__main__":
     main()
