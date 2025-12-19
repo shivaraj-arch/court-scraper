@@ -36,7 +36,9 @@ def http_worker_call_to_supabase():
         # If the function returns a file, 'response.content' will contain the binary data
         return response
     except Exception as e:
-        print(f"Exception:{e}")
+        logging.error(f"supabase call error: {e}")
+        #print(f"Exception:{e}")
+        return
 
 
 def scrape_display_board():
