@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, time
 from supabase import create_client, Client
 import logging
+import httpx
+
 
 # Configuration from environment variables
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -21,9 +23,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
 def http_worker_call_to_supabase():
-    url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-responder"
-    supabase: Client = create_client(url, SUPABASE_KEY)
     try:
+        url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-responder"
+
+        supabase: Client = create_client(url, SUPABASE_KEY) #,options={"function_client_timeout": 60,"postgrest_client_timeout": 60})
+
+        supabase.functions._client.timeout = httpx.Timeout(60.0)
         # Invoke the function
         response = supabase.functions.invoke(
             "http-responder", # Name of your Edge Function
@@ -35,6 +40,7 @@ def http_worker_call_to_supabase():
         # Access the downloaded data
         # If the function returns a file, 'response.content' will contain the binary data
         return response
+
     except Exception as e:
         logging.error(f"supabase call error: {e}")
         #print(f"Exception:{e}")
