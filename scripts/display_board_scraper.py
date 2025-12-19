@@ -75,7 +75,7 @@ def scrape_display_board():
         logging.error(f"Scraping error: {e}")
         return []
 
-def update_supabase(records):
+def update_supabase_recordwise(records):
     """Update Supabase with heard cases"""
     if not records:
         logging.info("No records to update")
@@ -128,6 +128,20 @@ def update_supabase(records):
         logging.error(f"Supabase error: {e}")
         return 0
 
+def update_supabase_batch(records):
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    payload = [{
+        'date': datetime.now().strftime('%Y-%m-%d'),
+        'court_hall': r['ch_no'],
+        'list_number': r['list_no'],
+        'case_number': r['case_no'],
+        'timestamp': datetime.now().isoformat()
+    } for r in records]
+
+    # This is 1 single API invocation regardless of record count
+    supabase.rpc('batch_upsert_cases', {'payload': payload}).execute()
+
+
 def main():
     """Main execution"""
     logging.info("Starting display board scraper")
@@ -143,7 +157,7 @@ def main():
     logging.info(f"Scraped {len(records)} records")
     
     if records:
-        update_supabase(records)
+        update_supabase_batch(records)
 
 if __name__ == "__main__":
     main()
