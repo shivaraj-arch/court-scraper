@@ -34,7 +34,8 @@ def http_worker_call_to_supabase():
             "http-responder", # Name of your Edge Function
             invoke_options={
                 "body": {"targetUrl": DISPLAY_BOARD_URL},
-                "method": "POST"
+                "method": "POST",
+                "headers": {"x-region": "ap-south-1"}# Force execution in India}
             }
         )
         # Access the downloaded data
