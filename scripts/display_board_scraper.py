@@ -128,18 +128,36 @@ def update_supabase_recordwise(records):
         logging.error(f"Supabase error: {e}")
         return 0
 
-def update_supabase_batch(records):
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    payload = [{
-        'date': datetime.now().strftime('%Y-%m-%d'),
-        'court_hall': r['ch_no'],
-        'list_number': r['list_no'],
-        'case_number': r['case_no'],
-        'timestamp': datetime.now().isoformat()
-    } for r in records]
 
-    # This is 1 single API invocation regardless of record count
-    supabase.rpc('batch_upsert_cases', {'payload': payload}).execute()
+def upsert_supabase_batch(records):
+    """
+    Sends all records in ONE request.
+    The DB handles duplication logic and appearance increments.
+    """
+    if not records:
+        return 0
+
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        now_iso = datetime.now().isoformat()
+        today_str = datetime.now().strftime('%Y-%m-%d')
+
+        payload = [{
+            'date': today_str,
+            'court_hall': r['ch_no'],    # Function casts this to int
+            'list_number': r['list_no'], # Function casts this to int
+            'case_number': r['case_no'], # Function casts this to text
+            'timestamp': now_iso         # Function casts this to timestamptz
+        } for r in records]
+
+        # Single API Call
+        supabase.rpc('batch_upsert_cases', {'payload': payload}).execute()
+
+        return len(records)
+    except Exception as e:
+        logging.error(f"Supabase RPC error: {e}")
+        return 0
+
 
 
 def main():
@@ -156,8 +174,12 @@ def main():
     records = scrape_display_board()
     logging.info(f"Scraped {len(records)} records")
     
-    if records:
-        update_supabase_batch(records)
+    try:
+        if records:
+            upsert_supabase_batch(records)
+    except Exception as e:
+        logging.error(f"Supabase Outer Upsert error: {e}")
+        return 0
 
 if __name__ == "__main__":
     main()
