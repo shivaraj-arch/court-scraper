@@ -17,7 +17,10 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 CAUSE_LIST_URL = "https://judiciary.karnataka.gov.in/pdfs/consolidatedCauselist/blrconsolidation.pdf"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',    handlers=[
+        logging.FileHandler('app.log'),  # Creates log file
+        logging.StreamHandler()  # Also logs to console
+    ])
 
 
 def http_worker_call_to_supabase():
