@@ -40,7 +40,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          python dashboard_generator.py
+          python scripts/dashboard_generator.py
       
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
