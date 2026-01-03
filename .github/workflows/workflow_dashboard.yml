@@ -26,7 +26,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install supabase-py
+          pip install -r requirements.txt
       
       - name: Run EOD Processor
         env:
