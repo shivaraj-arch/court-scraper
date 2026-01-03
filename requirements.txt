@@ -4,3 +4,4 @@ supabase==2.9.0
 PyPDF2==3.0.1
 httpx>=0.26
 pypdf
+supabase-py
