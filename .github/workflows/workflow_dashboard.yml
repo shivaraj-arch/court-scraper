@@ -33,7 +33,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          python eod_processor.py
+          python scripts/eod_processor.py
       
       - name: Generate Dashboard
         env:
