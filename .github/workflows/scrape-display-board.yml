@@ -3,7 +3,7 @@ name: Scrape Display Board
 on:
   schedule:
     - cron: '35 4 * * *'   # Morning 10:05 AM IST (4:35 AM UTC) - targets 10:25 AM with delay
-    - cron: '40 8 * * *'    # Afternoon 2:30 PM IST (9:00 AM UTC) - targets 2:30 PM with delay
+    - cron: '0 9 * * *'    # Afternoon 2:30 PM IST (9:00 AM UTC) - targets 2:30 PM with delay
   workflow_dispatch:
     inputs:
       job_type:
@@ -16,6 +16,9 @@ on:
           - both
         default: 'morning'
 
+permissions:
+  contents: read
+
 jobs:
   morning-scrape:
     if: |
@@ -24,18 +27,17 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run morning scraper
         env:
@@ -59,18 +61,17 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run afternoon scraper
         env:
