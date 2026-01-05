@@ -54,26 +54,16 @@ def download_pdf(url):
         logging.error(f"PDF download error: {e}")
         return None
 
-
 def parse_judges(judge_line):
     """Parse judge names from BEFORE section"""
-    P_JUDGES = re.compile(
-        r"BEFORE\s*THE HON'BLE (.*?)\s*&\s*THE HON'BLE (.*?)\s*(?=\(To get Daily Causelist|COURT HALL NO|$)", 
-        re.DOTALL | re.IGNORECASE
-    )
-    P_SINGLE_JUDGE = re.compile(
-        r"BEFORE\s*THE HON'BLE JUSTICE (.*?)\s*(?=\(To get Daily Causelist|COURT HALL NO|$)", 
-        re.DOTALL | re.IGNORECASE
-    )
-    
-    judge_match_double = P_JUDGES.search(judge_line)
-    judge_match_single = P_SINGLE_JUDGE.search(judge_line)
-    
-    if judge_match_double:
-        return f"{judge_match_double.group(1).strip()} & {judge_match_double.group(2).strip()}"
-    elif judge_match_single:
-        return judge_match_single.group(1).strip()
-    return "N/A"
+    # Remove 'BEFORE' prefix
+    text = re.sub(r'^BEFORE\s+', '', judge_line.strip(), flags=re.IGNORECASE)
+    # Remove all instances of 'THE HON'BLE' (handles both single and double judge lines)
+    text = re.sub(r'THE\s+HON\'BLE\s+', '', text, flags=re.IGNORECASE)
+    # Clean up extra whitespace and newlines
+    text = " ".join(text.split()).strip()
+
+    return text if text else "N/A"
 
 
 def parse_case_details(raw_case_id):
@@ -159,7 +149,7 @@ def parse_pdf_to_cases(pdf_file):
     combined_pattern = re.compile(
         r"(?:COURT\s+HALL\s+NO\s*:\s*(\d+))|" +
         r"(?:CAUSE\s+LIST\s+NO\.\s*(\d+))|" +
-        r"(BEFORE\s*THE HON'BLE JUSTICE.*?(?=\(To get))|" +
+        r"(BEFORE\s+(?:THE\s+HON'BLE|REGISTRAR).*?(?=\(To get))|" +
         r"(?:^\s*(\d+)\s+([A-Z].+?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" +
         r"(?=\n\s*(?:\d+\s+[A-Z]|COURT|CAUSE|BEFORE|---END---|$)))",
         re.MULTILINE | re.IGNORECASE | re.DOTALL
