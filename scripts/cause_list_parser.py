@@ -172,9 +172,9 @@ def parse_pdf_to_cases(pdf_file):
             # Parse case details
             case_no, case_type, case_details = parse_case_details(raw_case_id)
             
-            # Extract advocates
-            pet_adv = extract_advocate(pet)
-            res_adv = extract_advocate(res)
+            # Extract advocates TODO
+            #pet_adv = extract_advocate(pet)
+            #res_adv = extract_advocate(res)
             
             case_record = {
                 'date': date_str,
@@ -185,8 +185,8 @@ def parse_pdf_to_cases(pdf_file):
                 'case_type': case_type,
                 'case_details': case_details if case_details != "N/A" else None,
                 'judges': current_judges if current_judges != "N/A" else None,
-                'petitioner_adv': pet_adv,
-                'respondent_adv': res_adv
+                'petitioner_adv': pet,
+                'respondent_adv': res
             }
             
             all_cases.append(case_record)
