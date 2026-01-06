@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Simplified Cause List PDF Parser
-Based on test14.py with Supabase integration
+Based on test20.py with Supabase integration
 """
 
 import os
@@ -204,6 +204,12 @@ def insert_to_supabase(cases):
     
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+        # Delete all existing rows from cause_list table (daily fresh start)
+        logging.info("Clearing cause_list table for today's data...")
+        supabase.table('cause_list').delete().neq('case_number', '').execute()
+        logging.info("Previous cause_list data cleared")
+
         
         logging.info(f"Calling RPC function with {len(cases)} cases...")
         result = supabase.rpc('insert_cause_list_batch', {'cases_data': cases}).execute()
