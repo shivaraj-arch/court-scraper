@@ -16,6 +16,18 @@ import httpx
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 CAUSE_LIST_URL = "https://judiciary.karnataka.gov.in/pdfs/consolidatedCauselist/blrconsolidation.pdf"
+# Constants for anchor-based parsing
+CASE_TYPES_LIST = [
+    r"MFA\.CROB", r"MSA\.CROB", r"RFA\.CROB", r"RSA\.CROB", r"WA\.CROB", r"ITA\.CROB", r"OSA\.CROB",
+    r"COM\.APLN", r"COMAP\.CR", r"MISC\.CRL", r"MISC\.CVL", r"RERA\.CRB", r"CC\(CIA\)", r"CP\.KLRA", 
+    r"PROB\.CP", r"CRL\.CCC", r"CRL\.RP", r"CRL\.RC", r"MISC\.W", r"MISC\.P", r"RERA\.A", r"AP\.EFA", 
+    r"AP\.IM", r"COM\.OS", r"COM\.S", r"COMAP", r"COMPA", r"CRL\.A", r"CRL\.P", r"EX\.FA", r"EX\.SA", 
+    r"HRRP", r"ITRC", r"LRRP", r"LTRP", r"SCLAP", r"STRP", r"TAET", r"WPHC", r"WPCP", r"CSTA", r"CROB", 
+    r"MISC", r"CCC", r"CEA", r"CMP", r"COA", r"COP", r"CRA", r"CRC", r"CRP", r"GTA", r"ITA", r"MFA", 
+    r"MSA", r"OLR", r"OSA", r"RFA", r"TOS", r"TRC", r"WTA", r"AC", r"CA", r"CP", r"OS", r"RA", r"RP", 
+    r"WA", r"WP", r"SA", r"S"
+]
+CASE_TYPES_REGEX = "|".join(CASE_TYPES_LIST)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',    handlers=[
         logging.FileHandler('app.log'),  # Creates log file
@@ -139,22 +151,24 @@ def parse_pdf_to_cases(pdf_file):
         full_document_text.append(page_text)
 
     cleaned_text = "\n".join(full_document_text)
+    # Pre-clean: Remove footers that break multi-page cases and noise markers
+    cleaned_text = re.sub(r"Website:https://judiciary\.karnataka\.gov\.in.*?Page \d+ of \d+.*?\n", "", cleaned_text)
+    cleaned_text = re.sub(r"Connected With", "", cleaned_text, flags=re.IGNORECASE)
     
     # State tracking
     current_hall, current_cause_list, current_judges = "N/A", "N/A", "N/A"
     all_cases = []
     date_str = datetime.now().strftime('%Y-%m-%d')
 
-    # Combined pattern for sequential extraction
+    # Combined pattern updated with Case Type anchors and decimal serial numbers
     combined_pattern = re.compile(
         r"(?:COURT\s+HALL\s+NO\s*:\s*(\d+))|" +
         r"(?:CAUSE\s+LIST\s+NO\.\s*(\d+))|" +
         r"(BEFORE\s+(?:THE\s+HON'BLE|REGISTRAR).*?(?=\(To get))|" +
-        r"(?:^\s*(\d+)\s+([A-Z].+?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" +
-        r"(?=\n\s*(?:\d+\s+[A-Z]|COURT|CAUSE|BEFORE|---END---|$)))",
+        r"(?:^\s*(\d+(?:\.\d+)?)\s+((?:%s)\s+\d+.*?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" % CASE_TYPES_REGEX +
+        r"(?=\n\s*(?:\d+(?:\.\d+)?\s+(?:%s)|CAUSE|BEFORE|---END---|$)))" % CASE_TYPES_REGEX,
         re.MULTILINE | re.IGNORECASE | re.DOTALL
     )
-
     matches = combined_pattern.findall(cleaned_text)
     
     for match in matches:
@@ -169,6 +183,8 @@ def parse_pdf_to_cases(pdf_file):
             current_judges = parse_judges(judge_line)
             logging.info(f"  Judges: {current_judges}")
         elif sno:
+            # Clean RES if any footer hall info was captured
+            res = re.sub(r"COURT\s+HALL\s+NO\s*:\s*\d+", "", res, flags=re.IGNORECASE).strip()
             # Parse case details
             case_no, case_type, case_details = parse_case_details(raw_case_id)
             
@@ -180,7 +196,7 @@ def parse_pdf_to_cases(pdf_file):
                 'date': date_str,
                 'court_hall': int(current_hall) if current_hall != "N/A" else None,
                 'list_number': int(current_cause_list) if current_cause_list != "N/A" else None,
-                'sl_no': int(sno),
+                'sl_no': float(sno), # Float supports 44.1
                 'case_number': case_no,
                 'case_type': case_type,
                 'case_details': case_details if case_details != "N/A" else None,
