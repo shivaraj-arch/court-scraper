@@ -3,7 +3,7 @@ name: Parse Cause List
 on:
   schedule:
     # Run daily at 9:00 AM IST (3:30 AM UTC)
-    - cron: '30 3 * * *'
+    - cron: '30 2 * * *'
   workflow_dispatch:
 
 jobs:

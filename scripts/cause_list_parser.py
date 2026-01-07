@@ -18,15 +18,16 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 CAUSE_LIST_URL = "https://judiciary.karnataka.gov.in/pdfs/consolidatedCauselist/blrconsolidation.pdf"
 # Constants for anchor-based parsing
 CASE_TYPES_LIST = [
-    r"MFA\.CROB", r"MSA\.CROB", r"RFA\.CROB", r"RSA\.CROB", r"WA\.CROB", r"ITA\.CROB", r"OSA\.CROB",
-    r"COM\.APLN", r"COMAP\.CR", r"MISC\.CRL", r"MISC\.CVL", r"RERA\.CRB", r"CC\(CIA\)", r"CP\.KLRA", 
-    r"PROB\.CP", r"CRL\.CCC", r"CRL\.RP", r"CRL\.RC", r"MISC\.W", r"MISC\.P", r"RERA\.A", r"AP\.EFA", 
-    r"AP\.IM", r"COM\.OS", r"COM\.S", r"COMAP", r"COMPA", r"CRL\.A", r"CRL\.P", r"EX\.FA", r"EX\.SA", 
-    r"HRRP", r"ITRC", r"LRRP", r"LTRP", r"SCLAP", r"STRP", r"TAET", r"WPHC", r"WPCP", r"CSTA", r"CROB", 
-    r"MISC", r"CCC", r"CEA", r"CMP", r"COA", r"COP", r"CRA", r"CRC", r"CRP", r"GTA", r"ITA", r"MFA", 
-    r"MSA", r"OLR", r"OSA", r"RFA", r"TOS", r"TRC", r"WTA", r"AC", r"CA", r"CP", r"OS", r"RA", r"RP", 
-    r"WA", r"WP", r"SA", r"S"
-]
+    r"AC", r"AP\.EFA", r"AP\.IM", r"CA", r"CC\(CIA\)", r"CCC", r"CEA", r"CMP", r"COA",
+    r"COM\.APLN", r"COM\.OS", r"COM\.S", r"COMAP", r"COMAP\.CR", r"COMPA", r"COP", r"CP",
+    r"CP\.KLRA", r"CRA", r"CRC", r"CRL\.A", r"CRL\.CCC", r"CRL\.P", r"CRL\.RC", r"CRL\.RP",
+    r"CROB", r"CRP", r"CSTA", r"EX\.FA", r"EX\.SA", r"GTA", r"HRRP", r"ITA", r"ITA\.CROB",
+    r"ITRC", r"LRRP", r"LTRP", r"MFA", r"MFA\.CROB", r"MISC\.CRL", r"MISC\.CVL", r"MISC\.P",
+    r"MISC\.W", r"MSA", r"MSA\.CROB", r"OLR", r"OS", r"OSA", r"OSA\.CROB", r"PROB\.CP",
+    r"RA", r"RERA\.A", r"RERA\.CRB", r"RFA", r"RFA\.CROB", r"RP", r"RPFC", r"RSA",
+    r"RSA\.CROB", r"SCLAP", r"STA", r"STRP", r"TAET", r"TOS", r"TRC", r"WA", r"WA\.CROB",
+    r"WP", r"WPCP", r"WPHC", r"WTA", r"EP"
+] #EP added as its not present in casetypes.pdf after 28 its 30
 CASE_TYPES_REGEX = "|".join(CASE_TYPES_LIST)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',    handlers=[
@@ -164,7 +165,7 @@ def parse_pdf_to_cases(pdf_file):
     combined_pattern = re.compile(
         r"(?:COURT\s+HALL\s+NO\s*:\s*(\d+))|" +
         r"(?:CAUSE\s+LIST\s+NO\.\s*(\d+))|" +
-        r"(BEFORE\s+(?:THE\s+HON'BLE|REGISTRAR).*?(?=\(To get))|" +
+        r"(BEFORE\s+(?:THE\s+HON'BLE\s+(?:(?:DR\.|MRS\.|MS\.|CHIEF|[A-Z\.]{2,10})\s+)?JUSTICE|REGISTRAR).*?(?=\(To get))|" +
         r"(?:^\s*(\d+(?:\.\d+)?)\s+((?:%s)\s+\d+.*?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" % CASE_TYPES_REGEX +
         r"(?=\n\s*(?:\d+(?:\.\d+)?\s+(?:%s)|CAUSE|BEFORE|---END---|$)))" % CASE_TYPES_REGEX,
         re.MULTILINE | re.IGNORECASE | re.DOTALL

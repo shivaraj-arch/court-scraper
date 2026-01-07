@@ -19,7 +19,12 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 DISPLAY_BOARD_URL = "https://judiciary.karnataka.gov.in/display_board_bench.php"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',
+                    handlers=[
+        logging.FileHandler('app.log'),  # Creates log file
+        logging.StreamHandler()  # Also logs to console
+    ]
+)
 
 
 def http_worker_call_to_supabase():
@@ -137,11 +142,10 @@ def update_supabase_recordwise(records):
         logging.error(f"Supabase error: {e}")
         return 0
 
-
 def upsert_supabase_batch(records):
     """
     Sends all records in ONE request.
-    The DB handles duplication logic and appearance increments.
+    Increments appearances by days since last seen, not by scrape count.
     """
     if not records:
         return 0
@@ -153,15 +157,16 @@ def upsert_supabase_batch(records):
 
         payload = [{
             'date': today_str,
-            'court_hall': r['ch_no'],    # Function casts this to int
-            'list_number': r['list_no'], # Function casts this to int
-            'case_number': r['case_no'], # Function casts this to text
-            'timestamp': now_iso         # Function casts this to timestamptz
+            'court_hall': r['ch_no'],
+            'list_number': r['list_no'],
+            'case_number': r['case_no'],
+            'timestamp': now_iso
         } for r in records]
 
         # Single API Call
         supabase.rpc('batch_upsert_cases', {'payload': payload}).execute()
-
+        
+        logging.info(f"Batch upserted {len(records)} cases")
         return len(records)
     except Exception as e:
         logging.error(f"Supabase RPC error: {e}")
@@ -182,7 +187,6 @@ def main():
     """
     records = scrape_display_board()
     logging.info(f"Scraped {len(records)} records")
-    
     try:
         if records:
             upsert_supabase_batch(records)
