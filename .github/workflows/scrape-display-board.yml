@@ -81,16 +81,16 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     
-    - name: Scrape display board (2:30 PM - 6:30 PM)
+    - name: Scrape display board (2:30 PM - 6:00 PM)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
-        # Run for 4 hours (240 minutes = 480 scrapes)
-        END_TIME=$(($(date +%s) + 14400))
+        # Run for 3.5 hours (210 minutes = 420 scrapes)
+        END_TIME=$(($(date +%s) + 12600))
         COUNT=0
         
-        echo "Starting afternoon session: 2:30 PM - 6:30 PM IST"
+        echo "Starting afternoon session: 2:30 PM - 6:00 PM IST"
         
         while [ $(date +%s) -lt $END_TIME ]; do
           COUNT=$((COUNT + 1))
