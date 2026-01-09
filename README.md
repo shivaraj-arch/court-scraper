@@ -1,292 +1,88 @@
-# Karnataka High Court Case Tracker
 
-A comprehensive system to track, analyze, and compare scheduled vs. heard cases at Karnataka High Court, Bengaluru. Automatically scrapes court display boards, parses cause list PDFs, and generates performance analytics for judges and advocates.
+# 🏛️ Karnataka High Court Case Tracker
 
----
-
-## 🎯 Features
-
-### Data Collection
-- **Real-time Display Board Scraping** - Tracks cases being heard in court halls
-- **Daily Cause List Parsing** - Extracts scheduled cases from PDF
-- **End-of-Day Analysis** - Compares scheduled vs. heard cases
-
-### Analytics & Insights
-- ✅ Judge performance metrics (hearing efficiency, disposal rates)
-- ✅ Advocate statistics (appearance frequency, success rates)
-- ✅ Case history tracking (listings, hearings, pending duration)
-- ✅ Success/failure rate analysis per court hall
-- ✅ Identify cases listed but never heard
-- ✅ Track cases heard maximum times
-- ✅ Most favored advocates by disposal rate
-
-### Storage Options
-- **Supabase (PostgreSQL)** - Cloud database with real-time queries
-- **CSV Files** - Local file-based storage (lightweight alternative)
+A high-performance intelligence system for the **Karnataka High Court (Bengaluru)**. This platform bridges the gap between the official **Cause List (Scheduled)** and the **Live Display Board (Actual)** to provide real-time transparency and long-term performance analytics.
 
 ---
 
-## 🏗️ Architecture
+## 🔄 System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Data Flow                                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  9:00 AM  → Parse Cause List PDF → cause_list_cases         │
-│             (Scheduled cases)                                │
-│                                                               │
-│  10:25 AM → Display Board Scraper → heard_cases             │
-│  - 5:30 PM  (Every 30 seconds)                              │
-│                                                               │
-│  6:00 PM  → EOD Analysis → Statistics Tables                │
-│             (Compare & Analyze)                              │
-│                                                               │
-└─────────────────────────────────────────────────────────────┘
+The tracker operates as a three-stage pipeline, moving data from raw court sources into actionable insights.
+
+```mermaid
+graph TD
+    A[9:00 AM: PDF Parser] -->|Extracts Schedule| B[(Supabase DB)]
+    C[10:30 AM: Live Scraper] -->|Polls Every 30s| B
+    B --> D[6:00 PM: EOD Analyst]
+    D -->|Aggregates| E[Judge & Advocate Metrics]
+    D -->|Updates| F[Static HTML Dashboard]
 ```
 
----
+### 1. The Parser (Structural Logic)
+Using **Anchor-Based Regex**, the parser identifies 70+ specific Case Type codes (MFA, WP, etc.) to accurately isolate case metadata. It is designed to "heal" cases split across page breaks and handle connected matters (e.g., Sl No 44.1).
 
-## 📊 Database Schema
+### 2. The Scraper (High-Frequency Polling)
+A lightweight engine that monitors the Live Display Board. It tracks the precise moment a case is called and finished, providing the raw data needed to calculate court efficiency.
 
-### Core Tables
-1. **`cause_list_cases`** - Morning scheduled cases from PDF
-2. **`heard_cases`** - Real-time cases from display board
-3. **`case_status_tracker`** - Daily comparison (scheduled vs heard)
-4. **`advocate_statistics`** - Daily advocate performance
-5. **`judge_statistics`** - Daily judge efficiency metrics
-6. **`case_history`** - Long-term case tracking
-
-See [Database Schema Documentation](docs/DATABASE.md) for detailed schema.
+### 3. The Analyst (Transactional SQL)
+The **End-of-Day (EOD) Engine** executes bulk transactional logic inside PostgreSQL to generate performance leaderboards and update historical tracking.
 
 ---
 
-## 🚀 Deployment Options
+## 🛡️ "Risk-Free" Design Features
 
-### Option 1: GitHub Actions (Automated Cloud)
-- ✅ Fully automated, no local infrastructure
-- ✅ Unlimited compute (public repo)
-- ⚠️ 5-minute minimum interval (not true 30-second scraping)
-- ⚠️ VM startup overhead (~30-60 seconds per run)
+This version (v2.1) has been specifically hardened to handle the unpredictable nature of legal data:
 
-### Option 2: Local macOS (Recommended)
-- ✅ True 30-second intervals with LaunchAgent/cron
-- ✅ No startup overhead
-- ✅ Full control over timing
-- ⚠️ Requires Mac to be online during court hours
-
-### Option 3: Hybrid (Best of Both)
-- ✅ GitHub Actions: Morning PDF parsing + EOD analysis
-- ✅ Local Mac: Real-time display board scraping
-- ✅ Combines cloud automation with precise timing
+*   **Alphanumeric-Ready:** Fully supports modern Court Hall designations (e.g., **Hall 2A**) and complex Serial Numbers (e.g., **Sl No 32(a)**).
+*   **Type-Safe Ingestion:** All volatile fields are stored as `TEXT` to prevent system crashes during PDF formatting changes.
+*   **Smart Cleaning:** Automatically strips page footers and "Connected With" markers mid-stream to ensure data continuity.
+*   **Asynchronous RPC:** Data insertion is handled via PostgreSQL Functions (RPC), reducing network overhead and ensuring atomic updates.
 
 ---
 
-## 📋 Prerequisites
+## 📊 Analytics & Insights
 
-- Python 3.9+
-- Supabase account (free tier sufficient)
-- GitHub account (for GitHub Actions deployment)
-- macOS/Linux (for local deployment)
+The system transforms raw strings into the following metrics:
 
----
-
-## 🛠️ Technology Stack
-
-**Backend:**
-- Python 3.11
-- Beautiful Soup 4 (HTML parsing)
-- PyPDF2 (PDF parsing)
-- Requests (HTTP client)
-- Supabase Python Client
-
-**Database:**
-- PostgreSQL (via Supabase)
-- Alternative: CSV files
-
-**Infrastructure:**
-- GitHub Actions (cloud automation)
-- LaunchAgent/Cron (local scheduling)
+| Category | Insights Generated |
+| :--- | :--- |
+| **Judges** | Hearing efficiency, cases-per-hour, and monthly performance ranking. |
+| **Advocates** | Appearance frequency, disposal rates, and listing-to-hearing ratios. |
+| **Halls** | Daily "Not Reached" backlogs and hall-specific workload distribution. |
+| **Cases** | Comprehensive history including every listing date and appearance status. |
 
 ---
 
-## 📁 Project Structure
+## 🚀 Deployment Modes
 
-```
-court-scraper/
-├── .github/
-│   └── workflows/
-│       ├── scrape-display-board.yml    # Display board scraper
-│       ├── parse-cause-list.yml        # Morning PDF parser
-│       └── eod-analysis.yml            # Evening analysis
-├── scripts/
-│   ├── display_board_scraper.py        # Real-time scraper
-│   ├── cause_list_parser.py            # PDF parser
-│   ├── eod_processor.py                # EOD statistics
-│   └── query_court_data.py             # Query utility
-├── docs/
-│   ├── DATABASE.md                     # Schema documentation
-│   └── QUERIES.md                      # SQL query examples
-├── requirements.txt                    # Python dependencies
-├── .env.example                        # Environment variables template
-├── README.md                           # This file
-└── INSTALL.md                          # Installation guide
-```
+| Option | Best For | Architecture |
+| :--- | :--- | :--- |
+| **Hybrid (Recommended)** | **Precision** | Local Mac (15s scraping) + GitHub Actions (Daily Logic). |
+| **GitHub Actions** | **Automation** | 100% Cloud-based using GitHub's free compute tier. |
+| **Local macOS** | **Control** | Full local control using LaunchAgents and Cron. |
 
 ---
 
-## 🔍 Sample Queries
+## 📈 Data Lake & Storage
 
-### Cases Pending (Listed but Not Heard)
-```sql
-SELECT cl.case_number, cl.petitioner_name, cl.petitioner_advocate
-FROM cause_list_cases cl
-LEFT JOIN heard_cases hc ON cl.case_number = hc.case_number 
-    AND cl.date = hc.date
-WHERE cl.date = '2025-12-17'
-  AND hc.id IS NULL;
-```
+To balance performance and cost, the system utilizes a **Hybrid Storage Strategy**:
 
-### Judge Performance
-```sql
-SELECT judge_name, court_hall,
-       AVG(hearing_efficiency) as avg_efficiency,
-       SUM(cases_heard) as total_heard
-FROM judge_statistics
-WHERE date >= '2025-12-01'
-GROUP BY judge_name, court_hall
-ORDER BY avg_efficiency DESC;
-```
-
-### Most Frequent Advocate
-```sql
-SELECT advocate_name, 
-       SUM(cases_scheduled) as total_cases,
-       AVG(hearing_rate) as avg_hearing_rate
-FROM advocate_statistics
-WHERE date >= '2025-12-01'
-GROUP BY advocate_name
-ORDER BY total_cases DESC
-LIMIT 10;
-```
-
-See [QUERIES.md](docs/QUERIES.md) for more examples.
-
----
-
-## 📈 Storage Requirements
-
-### Supabase (PostgreSQL)
-- **Daily data:** ~1 MB
-- **Monthly:** ~30 MB
-- **Yearly:** ~360 MB
-- **5 years:** ~1.8 GB
-- ✅ Free tier: 500 MB (sufficient for 1+ year)
-
-### CSV (Local)
-- **Daily:** ~100 KB per CSV file
-- **Yearly:** ~35 MB
-- **5 years:** ~175 MB
-
----
-
-## 🔐 Environment Variables
-
-Required environment variables:
-
-```bash
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_KEY=your-anon-key-here
-```
+1.  **Live Database (Supabase):** Stores active daily data for the real-time dashboard.
+2.  **Daily Archive (CSV Bucket):** At EOD, raw data is archived into datestamped CSV files. This allows the Live Database to be "wiped" daily, keeping the system lean and fast.
+3.  **Intelligence Layer:** A persistent `case_history` table retains minimal unique IDs to track long-term case trends without excessive storage overhead.
 
 ---
 
 ## 📊 Dashboard & Visualization
 
-Query scripts provided for:
-- Daily success rates
-- Judge performance comparison
-- Advocate ranking by cases
-- Long-term trends
-- Case disposal analytics
-
-Future: Web dashboard with charts and real-time updates.
-
----
-
-## 🐛 Troubleshooting
-
-### Display Board Scraper Issues
-- **No records found:** Check if court website is accessible
-- **HTML parsing errors:** Website structure may have changed
-- **Timeout errors:** Network connectivity issues
-
-### PDF Parser Issues
-- **PDF download fails:** Check URL and court website status
-- **Parsing errors:** PDF format may have changed
-- **Missing data:** Regex patterns need adjustment
-
-### Database Issues
-- **Connection errors:** Verify Supabase credentials
-- **Insert failures:** Check table schema matches
-- **Duplicate errors:** Unique constraints triggered
-
-See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for detailed solutions.
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-## 📞 Support
-
-- **Issues:** [GitHub Issues](https://github.com/your-username/court-scraper/issues)
-- **Documentation:** [Wiki](https://github.com/your-username/court-scraper/wiki)
-
----
-
-## 🙏 Acknowledgments
-
-- Karnataka High Court for public data access
-- Supabase for database infrastructure
-- GitHub for automation platform
-
----
-
-## 📅 Roadmap
-
-- [ ] Web dashboard with real-time updates
-- [ ] Email/SMS notifications for case hearings
-- [ ] Multi-court support (other Karnataka courts)
-- [ ] Mobile app for lawyers and litigants
-- [ ] Machine learning predictions for case outcomes
-- [ ] Historical data analysis (5+ years)
-- [ ] Export reports to PDF/Excel
-- [ ] API for third-party integrations
+The system automatically generates a **Static HTML Dashboard** featuring:
+- ✅ **Weekly Efficiency Trends** (via Chart.js)
+- ✅ **Judge Performance Leaderboard**
+- ✅ **Maintenance Banners** for real-time system status updates.
 
 ---
 
 ## ⚖️ Disclaimer
+This is an independent analytics project. Data is sourced from publicly available records on the Karnataka High Court website. It is not an official legal record.
 
-This project is for educational and informational purposes only. The data is sourced from publicly available information on the Karnataka High Court website. The accuracy of scraped data depends on the court website's availability and format. This tool is not affiliated with or endorsed by the Karnataka High Court.
-
----
-
-**Version:** 1.0.0  
-**Last Updated:** December 2025  
-**Status:** Active Development
-
----
-
+**Status:** `Active Development` | **Version:** `2.1 (Alphanumeric Update)`

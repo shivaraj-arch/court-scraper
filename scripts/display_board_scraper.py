@@ -79,8 +79,8 @@ def scrape_display_board():
                     
                     if ch_no and list_no and case_no:
                         records.append({
-                            'ch_no': int(ch_no) if ch_no.isdigit() else ch_no,
-                            'list_no': int(list_no) if list_no.isdigit() else list_no,
+                            'ch_no': ch_no,
+                            'list_no': list_no,
                             'case_no': case_no
                         })
         

@@ -163,8 +163,8 @@ def parse_pdf_to_cases(pdf_file):
 
     # Combined pattern updated with Case Type anchors and decimal serial numbers
     combined_pattern = re.compile(
-        r"(?:COURT\s+HALL\s+NO\s*:\s*(\d+))|" +
-        r"(?:CAUSE\s+LIST\s+NO\.\s*(\d+))|" +
+        r"(?:COURT\s+HALL\s+NO\s*:\s*(.*?)\n)|" +
+        r"(?:CAUSE\s+LIST\s+NO\.\s*(.*?)\n)|" +
         r"(BEFORE\s+(?:THE\s+HON'BLE\s+(?:(?:DR\.|MRS\.|MS\.|CHIEF|[A-Z\.]{2,10})\s+)?JUSTICE|REGISTRAR).*?(?=\(To get))|" +
         r"(?:^\s*(\d+(?:\.\d+)?)\s+((?:%s)\s+\d+.*?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" % CASE_TYPES_REGEX +
         r"(?=\n\s*(?:\d+(?:\.\d+)?\s+(?:%s)|CAUSE|BEFORE|---END---|$)))" % CASE_TYPES_REGEX,
@@ -195,9 +195,9 @@ def parse_pdf_to_cases(pdf_file):
             
             case_record = {
                 'date': date_str,
-                'court_hall': int(current_hall) if current_hall != "N/A" else None,
-                'list_number': int(current_cause_list) if current_cause_list != "N/A" else None,
-                'sl_no': float(sno), # Float supports 44.1
+                'court_hall': current_hall if current_hall != "N/A" else None,
+                'list_number': current_cause_list if current_cause_list != "N/A" else None,
+                'sl_no': sno, # Float supports 44.1
                 'case_number': case_no,
                 'case_type': case_type,
                 'case_details': case_details if case_details != "N/A" else None,

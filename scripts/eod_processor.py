@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from supabase import create_client, Client
 import logging
+import re
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -66,6 +67,11 @@ def process_eod(target_date=None):
         logging.error(f"EOD processing error: {e}")
         raise
 
+def natural_sort_key(s):
+    # Converts '2A' into [2, 'A'] so it sorts numerically then alphabetically
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split('([0-9]+)', str(s))]
+
 
 def generate_hall_stats(hall_data):
     """Generate statistics by court hall from pre-calculated data"""
@@ -73,7 +79,8 @@ def generate_hall_stats(hall_data):
         return
 
     logging.info("\nStatistics by Court Hall:")
-    for stats in sorted(hall_data, key=lambda x: x['court_hall']):
+    #for stats in sorted(hall_data, key=lambda x: x['court_hall']):
+    for stats in sorted(hall_data, key=lambda x: natural_sort_key(x['court_hall'])):
         hall = stats['court_hall']
         scheduled = stats['scheduled']
         heard = stats['heard']
