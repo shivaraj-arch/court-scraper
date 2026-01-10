@@ -3,9 +3,9 @@ name: Scrape Display Board
 on:
   schedule:
     # First session: 10:25 AM - 1:30 PM IST (4:55 AM - 8:00 AM UTC)
-    - cron: '40 4 * * *'
+    - cron: '40 4 * * 1-5'
     # Second session: 2:30 PM - 6:30 PM IST (9:00 AM - 1:00 PM UTC)
-    - cron: '45 8 * * *'
+    - cron: '45 8 * * 1-5'
   workflow_dispatch:
     inputs:
       job_type:
