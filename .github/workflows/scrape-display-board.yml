@@ -22,7 +22,7 @@ jobs:
   scrape-morning:
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '40 4 * * *') ||
+      (github.event.schedule == '40 4 * * 1-5') ||
       (github.event_name == 'workflow_dispatch' && (inputs.job_type == 'morning' || inputs.job_type == 'both'))
     
     steps:
@@ -65,7 +65,7 @@ jobs:
   scrape-afternoon:
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '45 8 * * *') ||
+      (github.event.schedule == '45 8 * * 1-5') ||
       (github.event_name == 'workflow_dispatch' && (inputs.job_type == 'afternoon' || inputs.job_type == 'both'))
     
     steps:
