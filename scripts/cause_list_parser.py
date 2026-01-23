@@ -35,6 +35,33 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',    h
         logging.StreamHandler()  # Also logs to console
     ])
 
+def extract_pdf_date(text):
+    """Extracts date from 'ON THE DAY OF ... 23rd Day Of January 2026'"""
+    pattern = re.compile(
+        r"ON THE DAY OF .*? THE (\d+)(?:st|nd|rd|th)?\s+Day\s+Of\s+([A-Za-z]+)\s+(\d{4})", 
+        re.IGNORECASE
+    )
+    match = pattern.search(text)
+    if match:
+        day, month, year = match.groups()
+        date_str = f"{day} {month} {year}"
+        try:
+            return datetime.strptime(date_str, "%d %B %Y").strftime("%Y-%m-%d")
+        except: return None
+    return None
+
+def toggle_system_switch(supabase, status, reason=""):
+    """Turns the global scraping/EOD switch ON or OFF"""
+    supabase.table('system_config').update({
+        'is_active': status,
+        'reason': reason,
+        'last_updated': datetime.now().isoformat()
+    }).eq('key', 'master_kill_switch').execute()
+
+def is_date_already_processed(supabase, pdf_date):
+    """Checks if this specific date is already in our history"""
+    result = supabase.table('daily_summary').select('date').eq('date', pdf_date).execute()
+    return len(result.data) > 0
 
 def http_worker_call_to_supabase():
     try:
@@ -155,7 +182,23 @@ def parse_pdf_to_cases(pdf_file):
     # Pre-clean: Remove footers that break multi-page cases and noise markers
     cleaned_text = re.sub(r"Website:https://judiciary\.karnataka\.gov\.in.*?Page \d+ of \d+.*?\n", "", cleaned_text)
     cleaned_text = re.sub(r"Connected With", "", cleaned_text, flags=re.IGNORECASE)
+    # check if the date is not the previous working day's!
+    pdf_date = extract_pdf_date(cleaned_text)
     
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        if pdf_date:
+            logging.info(f"PDF Date found: {pdf_date}")
+            if is_date_already_processed(supabase, pdf_date):
+                logging.warning("OLD DATE DETECTED. Turning system OFF for today.")
+                toggle_system_switch(supabase, False, f"Old date {pdf_date} detected. Likely holiday.")
+                return # Exit script
+            else:
+                logging.info("NEW DATE DETECTED. Turning system ON.")
+                toggle_system_switch(supabase, True, f"New date {pdf_date} detected.")
+    except Exception as e:
+        logging.error(f"Supabase RPC error: {e}")
+ 
     # State tracking
     current_hall, current_cause_list, current_judges = "N/A", "N/A", "N/A"
     all_cases = []
@@ -163,20 +206,28 @@ def parse_pdf_to_cases(pdf_file):
 
     # Combined pattern updated with Case Type anchors and decimal serial numbers
     combined_pattern = re.compile(
-        r"(?:COURT\s+HALL\s+NO\s*:\s*(.*?)\n)|" +
-        r"(?:CAUSE\s+LIST\s+NO\.\s*(.*?)\n)|" +
+        r"(?:COURT\s+HALL\s+NO\s*[:]\s*(\w+))|" +  #Capture \w+ to support 2A
+        r"(?:CAUSE\s+LIST\s+NO\.\s*(.*?)\n)|" +    
         r"(BEFORE\s+(?:THE\s+HON'BLE\s+(?:(?:DR\.|MRS\.|MS\.|CHIEF|[A-Z\.]{2,10})\s+)?JUSTICE|REGISTRAR).*?(?=\(To get))|" +
         r"(?:^\s*(\d+(?:\.\d+)?)\s+((?:%s)\s+\d+.*?)\s+PET:\s*(.+?)\s+RES:\s*(.+?)" % CASE_TYPES_REGEX +
         r"(?=\n\s*(?:\d+(?:\.\d+)?\s+(?:%s)|CAUSE|BEFORE|---END---|$)))" % CASE_TYPES_REGEX,
         re.MULTILINE | re.IGNORECASE | re.DOTALL
     )
     matches = combined_pattern.findall(cleaned_text)
-    
+    # State tracking
+    current_hall, current_cause_list, current_judges = "0", "0", "N/A"
+    orphans = []  # List for Hall-less cases found at the start of a page
+    all_cases = []
+ 
     for match in matches:
         hall, cause_no, judge_line, sno, raw_case_id, pet, res = match
 
         if hall:
             current_hall = hall.strip()
+            # ONLY Backfill court_hall for cases found before the hall was matched
+            for orphan in orphans:
+                orphan['court_hall'] = current_hall
+            orphans = []
             logging.info(f"Processing Court Hall {current_hall}")
         elif cause_no:
             current_cause_list = cause_no.strip()
@@ -184,7 +235,14 @@ def parse_pdf_to_cases(pdf_file):
             current_judges = parse_judges(judge_line)
             logging.info(f"  Judges: {current_judges}")
         elif sno:
-            # Clean RES if any footer hall info was captured
+            # 1. Search for hall footer in RES string (Pattern 1 behavior)
+            res_hall_match = re.search(r"COURT\s+HALL\s+NO\s*[:]\s*(\w+)", res, re.I)
+            if res_hall_match:
+                current_hall = res_hall_match.group(1).strip()
+                for orphan in orphans:
+                    orphan['court_hall'] = current_hall
+                orphans = []
+            # 2. Clean RES: Remove the footer hall info if it was captured
             res = re.sub(r"COURT\s+HALL\s+NO\s*:\s*\d+", "", res, flags=re.IGNORECASE).strip()
             # Parse case details
             case_no, case_type, case_details = parse_case_details(raw_case_id)
@@ -195,8 +253,8 @@ def parse_pdf_to_cases(pdf_file):
             
             case_record = {
                 'date': date_str,
-                'court_hall': current_hall if current_hall != "N/A" else None,
-                'list_number': current_cause_list if current_cause_list != "N/A" else None,
+                'court_hall': current_hall,
+                'list_number': current_cause_list,
                 'sl_no': sno, # Float supports 44.1
                 'case_number': case_no,
                 'case_type': case_type,
@@ -207,6 +265,10 @@ def parse_pdf_to_cases(pdf_file):
             }
             
             all_cases.append(case_record)
+            # 4. If we haven't found a hall yet ("0"), track it to backfill it later
+            if current_hall == "0":
+                orphans.append(case_record)
+
             logging.debug(f"  [{sno}] {case_no}")
 
     logging.info(f"Total cases parsed: {len(all_cases)}")

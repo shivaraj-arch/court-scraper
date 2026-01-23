@@ -43,6 +43,17 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
+        # --- SYSTEM STATUS CHECK ---
+        STATUS=$(curl -s "$SUPABASE_URL/rest/v1/system_config?key=eq.master_kill_switch&select=is_active" \
+          -H "apikey: $SUPABASE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_KEY" | jq -r '.[0].is_active')
+        
+        if [ "$STATUS" != "true" ]; then
+          echo "🛑 SYSTEM HALTED: Master kill switch is OFF (likely a holiday or old Cause List). Exiting job."
+          exit 0
+        fi
+        # ---------------------------
+
         # Run for 3 hours 5 minutes (185 minutes = 370 scrapes)
         END_TIME=$(($(date +%s) + 11100))
         COUNT=0
@@ -86,6 +97,17 @@ jobs:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: |
+        # --- SYSTEM STATUS CHECK ---
+        STATUS=$(curl -s "$SUPABASE_URL/rest/v1/system_config?key=eq.master_kill_switch&select=is_active" \
+          -H "apikey: $SUPABASE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_KEY" | jq -r '.[0].is_active')
+        
+        if [ "$STATUS" != "true" ]; then
+          echo "🛑 SYSTEM HALTED: Master kill switch is OFF. Exiting job."
+          exit 0
+        fi
+        # ---------------------------
+
         # Run for 3.5 hours (210 minutes = 420 scrapes)
         END_TIME=$(($(date +%s) + 12600))
         COUNT=0

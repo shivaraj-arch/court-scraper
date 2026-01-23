@@ -27,8 +27,21 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-      
+
+      - name: Check System Status
+        id: check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          # Fetch the master kill switch status from system_config table
+          STATUS=$(curl -s "$SUPABASE_URL/rest/v1/system_config?key=eq.master_kill_switch&select=is_active" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" | jq -r '.[0].is_active')
+          echo "active=$STATUS" >> $GITHUB_OUTPUT
+
       - name: Run EOD Processor
+        if: steps.check.outputs.active == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -36,6 +49,7 @@ jobs:
           python scripts/eod_processor.py
       
       - name: Generate Dashboard
+        if: steps.check.outputs.active == 'true'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -43,6 +57,7 @@ jobs:
           python scripts/dashboard_generator.py
       
       - name: Deploy to GitHub Pages
+        if: steps.check.outputs.active == 'true'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -51,6 +66,7 @@ jobs:
           commit_message: 'Update dashboard - ${{ github.run_number }}'
       
       - name: Create deployment summary
+        if: steps.check.outputs.active == 'true'
         run: |
           echo "# 📊 Dashboard Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
