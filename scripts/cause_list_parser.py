@@ -6,7 +6,7 @@ Based on test20.py with Supabase integration
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 from pypdf import PdfReader
 from io import BytesIO
@@ -187,18 +187,34 @@ def parse_pdf_to_cases(pdf_file):
     
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # Get today's date in IST (India Standard Time)
+        ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        today_date = ist_now.strftime('%Y-%m-%d')
+
         if pdf_date:
-            logging.info(f"PDF Date found: {pdf_date}")
-            if is_date_already_processed(supabase, pdf_date):
-                logging.warning("OLD DATE DETECTED. Turning system OFF for today.")
-                toggle_system_switch(supabase, False, f"Old date {pdf_date} detected. Likely holiday.")
+            logging.info(f"PDF Date found: {pdf_date} | Today's Date (IST): {today_date}")
+            
+            # Condition 1: Mismatch (Old or Future date)
+            if pdf_date != today_date:
+                reason = f"Date mismatch: PDF ({pdf_date}) is not Today ({today_date}). likely holiday/early preparation."
+                logging.warning(reason)
+                toggle_system_switch(supabase, False, reason)
                 return # Exit script
+                
+            # Condition 2: Already processed (Idempotency check)
+            elif is_date_already_processed(supabase, pdf_date):
+                logging.warning(f"Cause list for {pdf_date} already exists in database. Turning system OFF.")
+                toggle_system_switch(supabase, False, f"Date {pdf_date} already processed.")
+                return # Exit script
+                
+            # Condition 3: Match and New
             else:
-                logging.info("NEW DATE DETECTED. Turning system ON.")
-                toggle_system_switch(supabase, True, f"New date {pdf_date} detected.")
+                logging.info("VALID DATE DETECTED. Turning system ON.")
+                toggle_system_switch(supabase, True, f"Processing Cause List for {pdf_date}")
+                
     except Exception as e:
-        logging.error(f"Supabase RPC error: {e}")
- 
+        logging.error(f"Supabase date validation error: {e}")
+
     # State tracking
     current_hall, current_cause_list, current_judges = "N/A", "N/A", "N/A"
     all_cases = []
