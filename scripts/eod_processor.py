@@ -39,13 +39,14 @@ def process_eod(target_date=None):
             
         data = result.data
         summary = data['summary']
-        
+        eff_display = summary.get('overall_efficiency', 0) or 0
+    
         logging.info(f"Found {summary['total_scheduled']} scheduled cases")
         logging.info(f"Found {summary['total_heard']} heard cases")
         
         logging.info(f"Cases heard: {summary['total_heard']}")
         logging.info(f"Cases not reached: {summary['total_not_reached']}")
-        logging.info(f"Overall efficiency: {summary['overall_efficiency']}%")
+        logging.info(f"Overall efficiency: {eff_display}%")
         
         # Generate statistics by court hall from returned data
         generate_hall_stats(data.get('hall_stats', []))
@@ -127,7 +128,8 @@ def generate_summary_report(supabase, date_str):
     try:
         # Optimization: Fetch from daily_summary table instead of re-counting tables
         res = supabase.table('daily_summary').select('*').eq('date', date_str).execute()
-        
+        eff_display = summary.get('overall_efficiency', 0) or 0
+
         if res.data:
             summary = res.data[0]
             print(f"\n{'='*60}")
@@ -136,7 +138,7 @@ def generate_summary_report(supabase, date_str):
             print(f"Total Cases Scheduled: {summary['total_scheduled']}")
             print(f"Total Cases Heard: {summary['total_heard']}")
             print(f"Total Cases Not Reached: {summary['total_not_reached']}")
-            print(f"Overall Efficiency: {summary['overall_efficiency']}%")
+            print(f"Overall Efficiency: {eff_display}%")
             print(f"{'='*60}\n")
         
     except Exception as e:

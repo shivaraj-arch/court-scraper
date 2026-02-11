@@ -147,9 +147,16 @@ def generate_html(latest_date, daily, judges, weekly, monthly, top_judges):
     """Generate complete HTML dashboard"""
     
     # Calculate some stats
-    daily_efficiency = daily['overall_efficiency'] if daily else 0
-    daily_scheduled = daily['total_scheduled'] if daily else 0
-    daily_heard = daily['total_heard'] if daily else 0
+    # Change these lines to handle None values
+    daily_efficiency = daily.get('overall_efficiency', 0) if daily else 0
+    if daily_efficiency is None: daily_efficiency = 0.0
+
+    daily_scheduled = daily.get('total_scheduled', 0) if daily else 0
+    daily_heard = daily.get('total_heard', 0) if daily else 0
+
+    #daily_efficiency = daily['overall_efficiency'] if daily else 0
+    #daily_scheduled = daily['total_scheduled'] if daily else 0
+    #daily_heard = daily['total_heard'] if daily else 0
     
     # Generate weekly chart data
     weekly_dates = [d['date'] for d in weekly] if weekly else []
@@ -451,6 +458,9 @@ def generate_html(latest_date, daily, judges, weekly, monthly, top_judges):
 
 
 def generate_monthly_section(monthly):
+    efficiency = monthly.get('efficiency', 0) if monthly else 0
+    if efficiency is None: efficiency = 0.0
+
     """Generate monthly statistics section"""
     return f"""
         <div class="chart-container">
@@ -466,7 +476,7 @@ def generate_monthly_section(monthly):
                 </div>
                 <div class="stat-card">
                     <div class="label">Total Heard</div>
-                    <div class="value">{monthly['total_heard']}</div>
+                    <div class="value">{efficiency:.1f}</div>
                 </div>
                 <div class="stat-card">
                     <div class="label">Month Efficiency</div>
@@ -484,7 +494,8 @@ def generate_judge_rows(judges):
     
     rows = []
     for judge in judges:
-        efficiency = judge['hearing_efficiency']
+        efficiency = judge.get('hearing_efficiency', 0) or 0.0
+        #efficiency = judge['hearing_efficiency']
         badge_class = 'badge-success' if efficiency >= 70 else 'badge-warning'
         
         rows.append(f"""
