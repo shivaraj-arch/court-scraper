@@ -32,13 +32,21 @@ def process_eod(target_date=None):
         # Optimization: Move all logic to a single RPC call to handle bulk updates and aggregations
         # This fixes the N+1 query problem and reduces egress costs
         result = supabase.rpc('process_eod_logic', {'p_date': date_str}).execute()
-        
+            # CHANGE: Check if result.data is None (this means the SQL function skipped processing)
+        if result.data is None:
+            logging.info(f"Skipping EOD: No cases found in cause_list for {date_str} (likely holiday or parser hasn't run).")
+            return
+    
         if not result.data or not result.data.get('summary'):
             logging.warning(f"No scheduled cases found for {date_str} or processing returned no data")
             return
             
         data = result.data
         summary = data['summary']
+        if not summary:
+            logging.warning(f"No summary data found for {date_str}")
+            return
+
         eff_display = summary.get('overall_efficiency', 0) or 0
     
         logging.info(f"Found {summary['total_scheduled']} scheduled cases")
