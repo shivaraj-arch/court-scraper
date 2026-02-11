@@ -37,6 +37,8 @@ def generate_dashboard():
         # Fetch data
         daily_summary = get_daily_summary(supabase, latest_date)
         judge_stats = get_judge_statistics(supabase, latest_date)
+        weekly_trend = get_weekly_trend(supabase, latest_date)
+
         weekly_trend = get_weekly_trend(supabase)
         monthly_stats = get_monthly_stats(supabase)
         top_judges = get_top_judges_monthly(supabase)
@@ -77,14 +79,22 @@ def get_judge_statistics(supabase, date):
     return result.data
 
 
-def get_weekly_trend(supabase):
-    """Get last 7 days trend"""
-    end_date = datetime.now().date()
-    start_date = end_date - timedelta(days=6)
+def get_weekly_trend(supabase, latest_date_str):
+    """Get last 7 active days trend ending at the latest available date"""
+    # Convert latest_date string from DB back to a date object
+    end_date = datetime.strptime(latest_date_str, '%Y-%m-%d').date()
+    # Look back 14 days to ensure we find at least 7 working days
+    start_date = end_date - timedelta(days=14)
     
-    result = supabase.table('daily_summary').select('*').gte('date', str(start_date)).lte('date', str(end_date)).order('date').execute()
-    return result.data
-
+    result = supabase.table('daily_summary')\
+        .select('*')\
+        .gte('date', str(start_date))\
+        .lte('date', str(end_date))\
+        .order('date')\
+        .execute()
+    
+    # Return only the last 7 records found
+    return result.data[-7:] if result.data else []
 
 def get_monthly_stats(supabase):
     """Get current month statistics"""
