@@ -38,8 +38,6 @@ def generate_dashboard():
         daily_summary = get_daily_summary(supabase, latest_date)
         judge_stats = get_judge_statistics(supabase, latest_date)
         weekly_trend = get_weekly_trend(supabase, latest_date)
-
-        weekly_trend = get_weekly_trend(supabase)
         monthly_stats = get_monthly_stats(supabase)
         top_judges = get_top_judges_monthly(supabase)
         
