@@ -59,6 +59,7 @@ The system transforms raw strings into the following metrics:
 | :--- | :--- | :--- |
 | **Hybrid (Recommended)** | **Precision** | Local Mac (15s scraping) + GitHub Actions (Daily Logic). |
 | **GitHub Actions** | **Automation** | 100% Cloud-based using GitHub's free compute tier. |
+| **Supabase Triggers** | **Automation** | 100% Cloud-based using Supabase triggers pg_cron trigger-scheduling GitHub's Actions. |
 | **Local macOS** | **Control** | Full local control using LaunchAgents and Cron. |
 
 ---
