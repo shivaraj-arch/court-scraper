@@ -1,11 +1,6 @@
 name: Scrape Display Board
 
 on:
-  schedule:
-    # First session: 10:25 AM - 1:30 PM IST (4:55 AM - 8:00 AM UTC)
-    - cron: '40 4 * * 1-5'
-    # Second session: 2:30 PM - 6:30 PM IST (9:00 AM - 1:00 PM UTC)
-    - cron: '45 8 * * 1-5'
   workflow_dispatch:
     inputs:
       job_type:
@@ -16,13 +11,15 @@ on:
           - morning
           - afternoon
           - both
-        default: 'morning'
+        default: 'both'
+  repository_dispatch:
+    types: [trigger-morning, trigger-afternoon]
 
 jobs:
   scrape-morning:
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '40 4 * * 1-5') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'trigger-morning') ||
       (github.event_name == 'workflow_dispatch' && (inputs.job_type == 'morning' || inputs.job_type == 'both'))
     
     steps:
@@ -38,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     
-    - name: Scrape display board (10:25 AM - 1:30 PM)
+    - name: Scrape display board (Morning Session)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -58,25 +55,24 @@ jobs:
         END_TIME=$(($(date +%s) + 11100))
         COUNT=0
         
-        echo "Starting morning session: 10:25 AM - 1:30 PM IST"
+        echo "Starting morning session at $(date '+%Y-%m-%d %H:%M:%S')"
         
         while [ $(date +%s) -lt $END_TIME ]; do
           COUNT=$((COUNT + 1))
           echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
           python scripts/display_board_scraper.py
           
-          # Sleep 30 seconds unless it's the last iteration
           if [ $(date +%s) -lt $END_TIME ]; then
             sleep 30
           fi
         done
         
         echo "Morning session completed. Total scrapes: $COUNT"
-  
+
   scrape-afternoon:
     runs-on: ubuntu-latest
     if: |
-      (github.event.schedule == '45 8 * * 1-5') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'trigger-afternoon') ||
       (github.event_name == 'workflow_dispatch' && (inputs.job_type == 'afternoon' || inputs.job_type == 'both'))
     
     steps:
@@ -92,7 +88,7 @@ jobs:
     - name: Install dependencies
       run: pip install -r requirements.txt
     
-    - name: Scrape display board (2:30 PM - 6:00 PM)
+    - name: Scrape display board (Afternoon Session)
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -112,14 +108,13 @@ jobs:
         END_TIME=$(($(date +%s) + 12600))
         COUNT=0
         
-        echo "Starting afternoon session: 2:30 PM - 6:00 PM IST"
+        echo "Starting afternoon session at $(date '+%Y-%m-%d %H:%M:%S')"
         
         while [ $(date +%s) -lt $END_TIME ]; do
           COUNT=$((COUNT + 1))
           echo "Scrape #$COUNT at $(date '+%Y-%m-%d %H:%M:%S')"
           python scripts/display_board_scraper.py
           
-          # Sleep 30 seconds unless it's the last iteration
           if [ $(date +%s) -lt $END_TIME ]; then
             sleep 30
           fi
