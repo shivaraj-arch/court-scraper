@@ -65,7 +65,7 @@ def is_date_already_processed(supabase, pdf_date):
 
 def http_worker_call_to_supabase():
     try:
-        url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-worker"
+        url: str = SUPABASE_URL+"/functions/v1/http-worker"
         supabase: Client = create_client(url, SUPABASE_KEY)
         supabase.functions._client.timeout = httpx.Timeout(30.0)
         response = supabase.functions.invoke(
@@ -76,20 +76,26 @@ def http_worker_call_to_supabase():
                 "headers": {"x-region": "ap-south-1"}
             }
         )
-        return response
+        return response,None
     except Exception as e:
-        logging.error(f"HTTP worker exception: {e}")
-        return None
+        # Capture the actual error string (e.g., "invalid peer certificate: Expired")
+        error = str(e)
+        logging.error(f"HTTP worker exception: {error_str}")
+        return None, error_str
 
 
 def download_pdf(url):
     """Download PDF from URL"""
     try:
-        data = http_worker_call_to_supabase()
-        if data:
+        data, error = http_worker_call_to_supabase()
+        if data and not isinstance(data, dict): # Ensure data is the raw PDF bytes,not an error dict
             logging.info("PDF downloaded successfully")
-            return BytesIO(data)
-        return None
+            return BytesIO(data), None
+        # If data is a dict, the Edge Function might have returned a JSON error
+        if isinstance(data, dict) and 'error' in data:
+            return None, data['error']
+
+        return None, error or "Unknown download error"
     except Exception as e:
         logging.error(f"PDF download error: {e}")
         return None
@@ -342,10 +348,22 @@ def main():
     logging.info("="*60)
     logging.info("Starting Simplified Cause List Parser")
     logging.info("="*60)
+
+    # Capture both the file and the specific error
+    pdf_file, specific_error = download_pdf(CAUSE_LIST_URL)
     
-    pdf_file = download_pdf(CAUSE_LIST_URL)
     if not pdf_file:
-        logging.error("Failed to download PDF")
+        # 1. Update the Master Kill Switch with the actual technical error
+        # This is what will show up on your dashboard maintenance banner
+        try:
+            toggle_system_switch(supabase, False, f"Court Server Error: {specific_error}")
+        except:
+            pass
+        logging.error(f"Failed to download PDF: {specific_error}")
+        # 2. Force GitHub Action to fail (Status: Red) 
+        # This triggers the automatic GitHub email notification
+        sys.exit(1) 
+
         return
     
     cases = parse_pdf_to_cases(pdf_file)

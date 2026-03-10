@@ -484,7 +484,7 @@ def generate_monthly_section(monthly):
                 </div>
                 <div class="stat-card">
                     <div class="label">Total Heard</div>
-                    <div class="value">{efficiency:.1f}</div>
+                    <div class="value">{monthly['total_heard']}</div>
                 </div>
                 <div class="stat-card">
                     <div class="label">Month Efficiency</div>
@@ -499,9 +499,15 @@ def generate_judge_rows(judges):
     """Generate table rows for judges"""
     if not judges:
         return '<tr><td colspan="6" style="text-align: center;">No data available</td></tr>'
-    
+    judges_filtered = [j for j in judges if (j.get('cases_scheduled') or 0) >= 10]
+    # Check if ANY judges remain after the filter
+    if not judges_filtered:
+        return '<tr><td colspan="6" style="text-align: center;">No judges met the 10-case minimum criteria today</td></tr>'
+    # Sort naturally by Court Hall (1, 2, 2A, 10...)
+    judges_sorted = sorted(judges_filtered, key=lambda x: natural_sort_key(x['court_hall']))
     rows = []
-    for judge in judges:
+
+    for judge in judges_sorted:
         efficiency = judge.get('hearing_efficiency', 0) or 0.0
         #efficiency = judge['hearing_efficiency']
         badge_class = 'badge-success' if efficiency >= 70 else 'badge-warning'

@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s',
 
 def http_worker_call_to_supabase():
     try:
-        url: str = "https://gthnjueqoufdtwtzjcxg.supabase.co/functions/v1/http-responder"
+        url: str = SUPABASE_URL+"/functions/v1/http-responder"
 
         supabase: Client = create_client(url, SUPABASE_KEY) #,options={"function_client_timeout": 60,"postgrest_client_timeout": 60})
 
