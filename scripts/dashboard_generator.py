@@ -494,6 +494,11 @@ def generate_monthly_section(monthly):
         </div>
     """
 
+def natural_sort_key(s):
+    """Helper for alphanumeric sorting (e.g., '2', '2A', '10')"""
+    import re
+    return [int(text) if text.isdigit() else text.lower() 
+            for text in re.split('([0-9]+)', str(s or ""))]
 
 def generate_judge_rows(judges):
     """Generate table rows for judges"""
