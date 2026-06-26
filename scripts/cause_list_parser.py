@@ -58,6 +58,15 @@ def toggle_system_switch(supabase, status, reason=""):
         'last_updated': datetime.now().isoformat()
     }).eq('key', 'master_kill_switch').execute()
 
+def set_failure_reason(supabase, reason):
+    """Record a retryable technical failure in 'reason' WITHOUT changing is_active.
+    Supabase keys on this reason to fire the morning retries; the final reset
+    (after retries are exhausted) is decided on the Supabase side."""
+    supabase.table('system_config').update({
+        'reason': reason,
+        'last_updated': datetime.now().isoformat()
+    }).eq('key', 'master_kill_switch').execute()
+
 def is_date_already_processed(supabase, pdf_date):
     """Checks if this specific date is already in our history"""
     result = supabase.table('daily_summary').select('date').eq('date', pdf_date).execute()
@@ -79,7 +88,7 @@ def http_worker_call_to_supabase():
         return response,None
     except Exception as e:
         # Capture the actual error string (e.g., "invalid peer certificate: Expired")
-        error = str(e)
+        error_str = str(e)
         logging.error(f"HTTP worker exception: {error_str}")
         return None, error_str
 
@@ -98,7 +107,7 @@ def download_pdf(url):
         return None, error or "Unknown download error"
     except Exception as e:
         logging.error(f"PDF download error: {e}")
-        return None
+        return None, str(e)
 
 def parse_judges(judge_line):
     """Parse judge names from BEFORE section"""
@@ -353,18 +362,18 @@ def main():
     pdf_file, specific_error = download_pdf(CAUSE_LIST_URL)
     
     if not pdf_file:
-        # 1. Update the Master Kill Switch with the actual technical error
-        # This is what will show up on your dashboard maintenance banner
+        # Technical failure (site down / worker error). Write a 'technical failure'
+        # reason so the Supabase scheduler fires the morning retries (9:30, 10:15).
+        # Do NOT flip is_active here — the final reset, after retries are exhausted,
+        # is decided on the Supabase side. This is what shows on the maintenance banner.
         try:
-            toggle_system_switch(supabase, False, f"Court Server Error: {specific_error}")
-        except:
-            pass
+            supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+            set_failure_reason(supabase, f"technical failure: {specific_error}")
+        except Exception as e:
+            logging.error(f"Failed to write failure reason to system_config: {e}")
         logging.error(f"Failed to download PDF: {specific_error}")
-        # 2. Force GitHub Action to fail (Status: Red) 
-        # This triggers the automatic GitHub email notification
-        sys.exit(1) 
-
-        return
+        # Force GitHub Action to fail (Status: Red) for the email notification
+        sys.exit(1)
     
     cases = parse_pdf_to_cases(pdf_file)
    
